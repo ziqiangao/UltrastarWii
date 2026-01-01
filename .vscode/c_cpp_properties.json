@@ -4,27 +4,32 @@
             "name": "DevkitPPC-Wii",
             "includePath": [
                 "${workspaceFolder}/include",
-                "C:/devkitPro/libogc/include",
-                "C:/devkitPro/devkitPPC/powerpc-eabi/include/c++/15.2.0",
-                "C:/devkitPro/devkitPPC/powerpc-eabi/include/c++/15.2.0/powerpc-eabi",
-                "C:/devkitPro/devkitPPC/powerpc-eabi/include"
+                "C:/devkitPro/portlibs/wii/include",
+                "C:/devkitPro/portlibs/wii/include/grrlib",
+                "C:/devkitpro/libogc/include",
+                "C:/devkitpro/devkitPPC/powerpc-eabi/include",
+                "C:/devkitpro/devkitPPC/powerpc-eabi/include/c++/15.2.0",
+                "C:/devkitpro/devkitPPC/powerpc-eabi/include/c++/15.2.0/powerpc-eabi"
             ],
             "defines": [
                 "__WII__",
                 "HW_RVL",
                 "GEKKO",
-                "NO_INLINE_STDSTRING"
+                "NO_INLINE_STDSTRING",
+                "DEBUG"
             ],
-            "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
+            "compilerPath": "C:/devkitpro/devkitPPC/bin/powerpc-eabi-g++.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "gcc-x64",
+            "intelliSenseMode": "gcc-arm",
             "browse": {
                 "path": [
                     "${workspaceFolder}/include",
-                    "C:/devkitPro/libogc/include",
-                    "C:/devkitPro/devkitPPC/powerpc-eabi/include/c++/15.2.0",
-                    "C:/devkitPro/devkitPPC/powerpc-eabi/include"
+                    "C:/devkitPro/portlibs/wii/include",
+                    "C:/devkitPro/portlibs/wii/include/grrlib",
+                    "C:/devkitpro/libogc/include",
+                    "C:/devkitpro/devkitPPC/powerpc-eabi/include",
+                    "C:/devkitpro/devkitPPC/powerpc-eabi/include/c++/15.2.0"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }
