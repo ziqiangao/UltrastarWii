@@ -4,6 +4,7 @@
             "name": "DevkitPPC-Wii",
             "includePath": [
                 "${workspaceFolder}/include",
+                "${workspaceFolder}/build",
                 "C:/devkitPro/portlibs/wii/include",
                 "C:/devkitPro/portlibs/wii/include/grrlib",
                 "C:/devkitpro/libogc/include",
