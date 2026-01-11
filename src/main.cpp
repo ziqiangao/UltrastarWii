@@ -1,8 +1,10 @@
 #include <ogc/console.h>
 #include <fat.h>
 #include <stdio.h>
+#include <gccore.h>
 #include <wiiuse/wpad.h>
 #include "audioplayback.hpp"
+#include "bgvideo.hpp"   // provides videoloadandplay()
 
 void waitforpress()
 {
@@ -19,6 +21,12 @@ void waitforpress()
         if (buttons)
             return;
     }
+}
+
+void *audthread(void *arg)
+{
+    audioloadandplay("sd:/UltrastarWiiSongs/song.mp3");
+    return 0;
 }
 
 int main(void)
@@ -44,15 +52,29 @@ int main(void)
     // Determine stride
     int stride = rmode->fbWidth * VI_DISPLAY_PIX_SZ;
 
-    // Use full screen, starting at 0,0
+    // Initialise console on the framebuffer
     CON_Init(fb, 0, 0, rmode->fbWidth, rmode->xfbHeight, stride);
 
-
+    // Initialise FAT
     fatInitDefault();
 
-    int status = loadandplay("sd:/UltrastarWiiSongs/song.mp3");
+    // Start audio thread (safe to run in worker)
+    lwp_t thread_idaud;
+    s32 r0 = LWP_CreateThread(&thread_idaud, audthread, 0, NULL, 0, 50);
+    if (r0 != 0)
+    {
+        printf("Failed to create audio thread!\n");
+        waitforpress();
+        return 1;
+    }
+
+    // Run video playback on the main thread (GX must run on main)
+    // videoloadandplay will initialise its own GX texture/state if needed.
+    if (videoloadandplay("sd:/UltrastarWiiSongs/song.h264") != 0)
+    {
+        printf("Video playback failed\n");
+    }
 
     waitforpress();
-
     return 0;
 }

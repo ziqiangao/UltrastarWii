@@ -117,7 +117,7 @@ enum mad_flow output(void *cb_data,
     return MAD_FLOW_CONTINUE;
 }
 
-int loadandplay(const char* file)
+int audioloadandplay(const char* file)
 {
     stop = 0;
     struct mad_decoder decoder;
@@ -154,6 +154,6 @@ int loadandplay(const char* file)
     return 0;
 }
 
-void stopplayback() {
+void stopaudioplayback() {
     stop = 1;
 }
