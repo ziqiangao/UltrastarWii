@@ -4,7 +4,10 @@
 #include <gccore.h>
 #include <wiiuse/wpad.h>
 #include "audioplayback.hpp"
-#include "bgvideo.hpp"   // provides videoloadandplay()
+#include "bgvideo.hpp" // provides videoloadandplay()
+#include <malloc.h>
+#include <string.h>
+
 
 void waitforpress()
 {
@@ -33,6 +36,9 @@ int main(void)
 {
     VIDEO_Init();
     WPAD_Init();
+    void *gp_fifo = memalign(32, 256 * 1024);
+    memset(gp_fifo, 0, 256 * 1024);
+    GX_Init(gp_fifo, 256 * 1024);
 
     // Get the preferred video mode
     GXRModeObj *rmode = VIDEO_GetPreferredMode(NULL);
@@ -70,7 +76,7 @@ int main(void)
 
     // Run video playback on the main thread (GX must run on main)
     // videoloadandplay will initialise its own GX texture/state if needed.
-    if (videoloadandplay("sd:/UltrastarWiiSongs/song.h264") != 0)
+    if (videoloadandplay("sd:/test_640x360.h264") != 0)
     {
         printf("Video playback failed\n");
     }
