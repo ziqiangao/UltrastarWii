@@ -5,22 +5,42 @@
 #include <string.h>
 #include <unistd.h>
 #include "audioplayback.hpp"
+#include "globalstop.h"
 
-u8 stop = 0;
+static volatile u8 stop = 0;
+volatile u32 mp3time = 0;
 
 #define SAMPLES_PER_BUFFER 4096
+#define RING_BUFFERS 8
 
-static s16 audio_buffers[2][SAMPLES_PER_BUFFER * 2]
+static s16 audio_ring[RING_BUFFERS][SAMPLES_PER_BUFFER * 2]
     __attribute__((aligned(32)));
 
-static volatile int current_buffer = 0;
+static volatile int ring_write = 0;
+static volatile int ring_read = 0;
+static volatile int ring_filled = 0;
+static volatile int ring_bytes[RING_BUFFERS];
+
 static volatile int dma_busy = 0;
 
 #define INPUT_BUFFER_SIZE 8192
 
 void dma_callback()
 {
+    // DMA finished current transfer
     dma_busy = 0;
+
+    // If we have more filled buffers, start the next transfer immediately
+    if (ring_filled > 0 && !stop)
+    {
+        int idx = ring_read;
+        dma_busy = 1;
+        AUDIO_InitDMA((u32)audio_ring[idx], ring_bytes[idx]);
+        AUDIO_StartDMA();
+
+        ring_read = (ring_read + 1) % RING_BUFFERS;
+        ring_filled--;
+    }
 }
 
 static inline s16 mad_fixed_to_s16(mad_fixed_t sample)
@@ -61,9 +81,11 @@ enum mad_flow input(void *userdata, struct mad_stream *stream)
         INPUT_BUFFER_SIZE - remaining,
         mf->fp);
 
-
-    if (stop)
+    if (stop || globalstop)
+    {
+        printf("Stopped Audio\n");
         return MAD_FLOW_STOP;
+    }
 
     if (read == 0)
         return MAD_FLOW_STOP;
@@ -79,6 +101,8 @@ enum mad_flow output(void *cb_data,
                      struct mad_pcm *pcm)
 {
 
+    mp3time += pcm->length;
+
     if (!checked_rate)
     {
         if (pcm->samplerate != 48000)
@@ -87,11 +111,20 @@ enum mad_flow output(void *cb_data,
         checked_rate = 1;
     }
 
-    s16 *buffer = audio_buffers[current_buffer];
-    int nsamples = pcm->length;
+    
 
+    int nsamples = pcm->length;
     if (nsamples > SAMPLES_PER_BUFFER)
         nsamples = SAMPLES_PER_BUFFER;
+
+    // Wait for space in the ring buffer if full
+    while (ring_filled == RING_BUFFERS && !stop)
+        usleep(1000);
+
+    if (stop)
+        return MAD_FLOW_STOP;
+
+    s16 *buf = audio_ring[ring_write];
 
     for (int i = 0; i < nsamples; i++)
     {
@@ -100,26 +133,45 @@ enum mad_flow output(void *cb_data,
                     ? mad_fixed_to_s16(pcm->samples[1][i])
                     : l;
 
-        buffer[2 * i] = l;
-        buffer[2 * i + 1] = r;
+        buf[2 * i] = l;
+        buf[2 * i + 1] = r;
     }
 
-    while (dma_busy)
-        usleep(10);
+    // record byte length for this buffer (stereo: 2 samples per frame)
+    ring_bytes[ring_write] = nsamples * 2 * sizeof(s16);
 
-    dma_busy = 1;
+    // advance writer and increase filled count
+    ring_write = (ring_write + 1) % RING_BUFFERS;
+    ring_filled++;
 
-    AUDIO_InitDMA((u32)buffer, nsamples * 2 * sizeof(s16));
-    AUDIO_StartDMA();
+    // If DMA is idle, start transfer immediately
+    if (!dma_busy && ring_filled > 0 && !stop)
+    {
+        int idx = ring_read;
+        dma_busy = 1;
+        AUDIO_InitDMA((u32)audio_ring[idx], ring_bytes[idx]);
+        AUDIO_StartDMA();
 
-    current_buffer ^= 1;
+        ring_read = (ring_read + 1) % RING_BUFFERS;
+        ring_filled--;
+    }
 
     return MAD_FLOW_CONTINUE;
 }
 
-int audioloadandplay(const char* file)
+int audioloadandplay(const char *file)
 {
     stop = 0;
+    checked_rate = 0;
+    mp3time = 0;
+
+    printf("Loading Audio\n");
+
+    // initialise ring indices
+    ring_write = ring_read = ring_filled = 0;
+    for (int i = 0; i < RING_BUFFERS; ++i)
+        ring_bytes[i] = 0;
+
     struct mad_decoder decoder;
     struct mad_file mf;
     FILE *fp = fopen(file, "rb");
@@ -148,12 +200,21 @@ int audioloadandplay(const char* file)
 
     dma_busy = 0;
     mad_decoder_run(&decoder, MAD_DECODER_MODE_SYNC);
+
+    // Wait for any remaining queued buffers to finish playing
+    while ((ring_filled > 0 || dma_busy) && !stop)
+        usleep(1000);
+
     AUDIO_StopDMA();
     mad_decoder_finish(&decoder);
     fclose(fp);
     return 0;
 }
 
-void stopaudioplayback() {
+void stopaudioplayback()
+{
     stop = 1;
+    AUDIO_StopDMA();
+    // After setting stop, ensure DMA is not left running
+    // The dma_callback checks stop and will not start new transfers.
 }
