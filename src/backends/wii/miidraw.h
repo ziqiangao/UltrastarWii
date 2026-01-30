@@ -6,6 +6,7 @@
 ============================================*/
 
 #include <mii.h>
+#include <grrlib.h>
 
 extern Mii* miis;
 extern GRRLIB_texImg* img_staticmii[100];

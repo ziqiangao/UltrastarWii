@@ -2,7 +2,7 @@
 #include <grrlib.h>
 #include <ogc/console.h>
 #include <fat.h>
-#include <stdio.h>
+
 #include <gccore.h>
 #include <wiiuse/wpad.h>
 #include "audioplayback.hpp"
