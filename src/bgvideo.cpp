@@ -42,7 +42,7 @@ static double dt()
     u64 now = mp3time;
     double delta = (mp3time - lasttime) / 48000.0;
     lasttime = now;
-    //printf("%f\n",delta);
+    // printf("%f\n",delta);
     return delta;
 }
 
@@ -53,9 +53,12 @@ static inline u16 ycbcr_to_rgb565_lut(int y, int cb, int cr)
     int g = y - cb_g[cb] - cr_g[cr];
     int b = y + cb_b[cb];
 
-    if (r & ~255) r = (r < 0) ? 0 : 255;
-    if (g & ~255) g = (g < 0) ? 0 : 255;
-    if (b & ~255) b = (b < 0) ? 0 : 255;
+    if (r & ~255)
+        r = (r < 0) ? 0 : 255;
+    if (g & ~255)
+        g = (g < 0) ? 0 : 255;
+    if (b & ~255)
+        b = (b < 0) ? 0 : 255;
 
     return (u16)(((r & 0xF8) << 8) |
                  ((g & 0xFC) << 3) |
@@ -95,7 +98,8 @@ static inline void GRRLIB_SetPixelRGB565(
 // Replace vid_decode with this faster implementation
 static void vid_decode(plm_t *plm, plm_frame_t *frame, void *user)
 {
-    if (!frame || !user) return;
+    if (!frame || !user)
+        return;
 
     GRRLIB_texImg *tex = (GRRLIB_texImg *)user;
 
@@ -109,7 +113,7 @@ static void vid_decode(plm_t *plm, plm_frame_t *frame, void *user)
     const int plane_w = frame->y.width;
     const int chroma_w = frame->cb.width;
 
-    const int tex_w = tex->w;                    // may be padded
+    const int tex_w = tex->w; // may be padded
     const int tile_w = 4;
     const int tiles_per_row = tex_w / tile_w;
     u8 *base = (u8 *)tex->data;
@@ -162,10 +166,11 @@ static u8 stop = 0;
 static float ddtt = 0;
 void (*main_thread_vsync)(void);
 
-int videoloadandplay(const char* filename) {
+int videoloadandplay(const char *filename)
+{
     stop = 0;
     printf("Loading Video\n");
-        // open mpg file
+    // open mpg file
     FILE *file = fopen(filename, "rb");
     if (!file)
     {
@@ -202,9 +207,11 @@ int videoloadandplay(const char* filename) {
     while (!plm_has_ended(plm))
     {
 
-        if (stop || globalstop){
+        if (stop || globalstop)
+        {
             printf("Stopped Video\n");
-            break;}
+            break;
+        }
 
         ddtt = dt();
         // advance decoder (fixed step avoids audio drift)
@@ -217,7 +224,8 @@ int videoloadandplay(const char* filename) {
         GRRLIB_DrawImg(0, 0, video_tex, 0, 1.5, 2, 0xFFFFFFFF);
 
         // submit frame
-        if (main_thread_vsync) main_thread_vsync();
+        if (main_thread_vsync)
+            main_thread_vsync();
         GRRLIB_Render();
     }
 
@@ -227,14 +235,17 @@ int videoloadandplay(const char* filename) {
     return 0;
 }
 
-void stopvideoplayback() {
+void stopvideoplayback()
+{
     stop = 1;
 }
 
 static u8 video_playing = 0;
 
-int videoloadandplay_safe(const char* filename) {
-    if (video_playing) return 1;
+int videoloadandplay_safe(const char *filename)
+{
+    if (video_playing)
+        return 1;
     video_playing = 1;
 
     int result = videoloadandplay(filename);
@@ -243,9 +254,10 @@ int videoloadandplay_safe(const char* filename) {
     return result;
 }
 
-void play_video(const char* filename) {
-    stopvideoplayback();               // stop previous video
-    while(video_playing) VIDEO_WaitVSync();  // wait until fully stopped
-    videoloadandplay_safe(filename);        // start new video
+void play_video(const char *filename)
+{
+    stopvideoplayback(); // stop previous video
+    while (video_playing)
+        VIDEO_WaitVSync();           // wait until fully stopped
+    videoloadandplay_safe(filename); // start new video
 }
-
