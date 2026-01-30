@@ -1,6 +1,5 @@
 #include <mad.h>
 #include <ogc/audio.h>
-#include <gccore.h>
 #include <fat.h>
 #include <stdio.h>
 #include <string.h>
@@ -95,7 +94,6 @@ enum mad_flow input(void *userdata, struct mad_stream *stream)
 }
 
 static int checked_rate = 0;
-static int paused = 0;
 
 enum mad_flow output(void *cb_data,
                      const struct mad_header *header,
@@ -112,6 +110,8 @@ enum mad_flow output(void *cb_data,
         checked_rate = 1;
     }
 
+    
+
     int nsamples = pcm->length;
     if (nsamples > SAMPLES_PER_BUFFER)
         nsamples = SAMPLES_PER_BUFFER;
@@ -125,23 +125,6 @@ enum mad_flow output(void *cb_data,
 
     s16 *buf = audio_ring[ring_write];
 
-    while (globalpause && !stop)
-    {
-        VIDEO_WaitVSync();                          // wait for next frame
-        if (stop) {break;}
-        //memset(buf, 0, nsamples * 2 * sizeof(s16)); // fill silence
-        if (!paused)
-        {
-            AUDIO_StopDMA();
-            dma_busy = false;
-            paused = 1;
-        }
-        
-    }
-
-    paused = 0;
-
-    // Normal decoding
     for (int i = 0; i < nsamples; i++)
     {
         s16 l = mad_fixed_to_s16(pcm->samples[0][i]);
@@ -224,7 +207,6 @@ int audioloadandplay(const char *file)
     AUDIO_StopDMA();
     mad_decoder_finish(&decoder);
     fclose(fp);
-    globalstop = 1;
     return 0;
 }
 

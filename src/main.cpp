@@ -10,6 +10,7 @@
 #include <string.h>
 #include <ogcsys.h>
 #include <ogc/lwp_watchdog.h>
+#include <mp3player.h>
 #include "bgvideo.hpp"
 #include "globalstop.h"
 
@@ -27,7 +28,6 @@ void *audthread(void *arg)
 }
 
 volatile u8 globalstop = 0;
-volatile u8 globalpause = 0;
 volatile u8 resetflag = 0;
 
 void pwrcallback() {
@@ -39,12 +39,8 @@ void rstcallback(u32 irq, void* ctx) {
     resetflag = 1;
 }
 
-
 void vsync() {
-    WPAD_ScanPads();
-    if (WPAD_ButtonsDown(0) & WPAD_BUTTON_B) {
-        globalpause ^= 1;
-    }
+    
 }
 
 int main(void)
@@ -58,8 +54,8 @@ int main(void)
     // init FAT (GRRLIB may add FAT to devoptab, but safe to call)
     fatInitDefault();
     VIDPlayer_Init();
+    MP3Player_Init();
 
-    main_thread_vsync = vsync;
 
     SYS_SetPowerCallback(pwrcallback);
     SYS_SetResetCallback(rstcallback);
@@ -75,15 +71,14 @@ int main(void)
         return 1;
     }
 
-    play_video("sd:/UltrastarWiiSongs/song.mpg");
+    videoloadandplay("sd:/UltrastarWiiSongs/song.mpg");
 
+    GRRLIB_Exit();
 
     if (resetflag) {
         SYS_ResetSystem(SYS_RETURNTOMENU,0,0);
         return 0;
     }
-
-    GRRLIB_Exit();
 
     // waitforpress();
     return 0;
