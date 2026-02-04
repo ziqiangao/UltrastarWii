@@ -160,7 +160,7 @@ static void vid_decode(plm_t *plm, plm_frame_t *frame, void *user)
 
 static u8 stop = 0;
 static float ddtt = 0;
-void (*main_thread_vsync)(void);
+
 
 int videoloadandplay(const char* filename) {
     stop = 0;

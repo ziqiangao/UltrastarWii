@@ -1,69 +1,171 @@
-#-------------------------------------------------------------------
-# Master Makefile at workspace root
-# Cross-platform build system
-#-------------------------------------------------------------------
-
-# Default platform
-PLATFORM ?= windows
-
-# Include platform-specific slave Makefile
-ifeq ($(PLATFORM),wii)
-include src/backends/wii/Makefile
+#---------------------------------------------------------------------------------
+# Clear the implicit built in rules
+#---------------------------------------------------------------------------------
+.SUFFIXES:
+#---------------------------------------------------------------------------------
+ifeq ($(strip $(DEVKITPPC)),)
+$(error "Please set DEVKITPPC in your environment. export DEVKITPPC=<path to>devkitPPC")
 endif
 
-ifeq ($(PLATFORM),windows)
-include src/backends/windows/Makefile
+include $(DEVKITPPC)/wii_rules
+
+#---------------------------------------------------------------------------------
+# TARGET is the name of the output
+# BUILD is the directory where object files & intermediate files will be placed
+# SOURCES is a list of directories containing source code
+# INCLUDES is a list of directories containing extra header files
+#---------------------------------------------------------------------------------
+TARGET		:=	$(notdir $(CURDIR))
+BUILD		:=	build
+SOURCES		:=	src src/h264bsd
+DATA		:=	data data/mii
+INCLUDES	:=	src
+
+#---------------------------------------------------------------------------------
+# options for code generation
+#---------------------------------------------------------------------------------
+
+CFLAGS		= -g -O2 -Wall $(MACHDEP) $(INCLUDE)
+CXXFLAGS	= $(CFLAGS) -std=c++11
+
+LDFLAGS		= -g $(MACHDEP) -Wl,-Map,$(notdir $@).map
+
+#---------------------------------------------------------------------------------
+# any extra libraries we wish to link with the project
+#---------------------------------------------------------------------------------
+LIBS	:=	-ldb -lgrrlib -lpngu `$(PREFIX)pkg-config freetype2 libpng libjpeg --libs` -lfat -lwiiuse -lbte -logc -lmii -lisfs -lmad -lasnd
+
+#---------------------------------------------------------------------------------
+# list of directories containing libraries, this must be the top level containing
+# include and lib
+#---------------------------------------------------------------------------------
+LIBDIRS	:= $(PORTLIBS)
+
+#---------------------------------------------------------------------------------
+# no real need to edit anything past this point unless you need to add additional
+# rules for different file extensions
+#---------------------------------------------------------------------------------
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+#---------------------------------------------------------------------------------
+
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
+					$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+
+export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+
+#---------------------------------------------------------------------------------
+# automatically build a list of object files for our project
+#---------------------------------------------------------------------------------
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
+BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+
+#---------------------------------------------------------------------------------
+# use CXX for linking C++ projects, CC for standard C
+#---------------------------------------------------------------------------------
+ifeq ($(strip $(CPPFILES)),)
+	export LD	:=	$(CC)
+else
+	export LD	:=	$(CXX)
 endif
 
-#-------------------------------------------------------------------
-# Common build directories
-#-------------------------------------------------------------------
-BUILD := build/$(PLATFORM)
-SRC := src
-TARGET := $(TARGET)  # Taken from slave Makefile
+export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
+export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
+export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
 
-#-------------------------------------------------------------------
-# Collect source files
-#-------------------------------------------------------------------
-# Shared sources
-CPPFILES := $(wildcard $(SRC)/*.cpp)
-CFILES   := $(wildcard $(SRC)/*.c)
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 
-# Platform-specific sources from slave folder
-CPPFILES += $(wildcard $(SRC)/backends/$(PLATFORM)/*.cpp)
-CFILES   += $(wildcard $(SRC)/backends/$(PLATFORM)/*.c)
+#---------------------------------------------------------------------------------
+# build a list of include paths
+#---------------------------------------------------------------------------------
+export INCLUDE	:=	$(foreach dir,$(INCLUDES), -iquote $(CURDIR)/$(dir)) \
+					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+					-I$(CURDIR)/$(BUILD) \
+					-I$(LIBOGC_INC)
 
-#-------------------------------------------------------------------
-# Compute object file paths
-#-------------------------------------------------------------------
-OFILES_CPP := $(patsubst $(SRC)/%.cpp,$(BUILD)/%.o,$(CPPFILES))
-OFILES_C   := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(CFILES))
-OFILES     := $(OFILES_CPP) $(OFILES_C)
+#---------------------------------------------------------------------------------
+# build a list of library paths
+#---------------------------------------------------------------------------------
+export LIBPATHS	:= -L$(LIBOGC_LIB) $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-#-------------------------------------------------------------------
-# Build rules
-#-------------------------------------------------------------------
-all: $(BUILD)/$(TARGET)
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+.PHONY: $(BUILD) clean
 
-# Link executable
-$(BUILD)/$(TARGET): $(OFILES)
-	@mkdir -p $(dir $@)
-	$(CXX) $(OFILES) $(LDFLAGS) $(LIBS) -o $@
+#---------------------------------------------------------------------------------
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-# Compile C++ files
-$(BUILD)/%.o: $(SRC)/%.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
-
-# Compile C files
-$(BUILD)/%.o: $(SRC)/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
-#-------------------------------------------------------------------
-# Clean build
-#-------------------------------------------------------------------
+#---------------------------------------------------------------------------------
 clean:
-	rm -rf build/*
+	@echo clean ...
+	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
 
-.PHONY: all clean
+#---------------------------------------------------------------------------------
+run:
+	wiiload $(TARGET).dol
+
+
+#---------------------------------------------------------------------------------
+else
+
+DEPENDS	:=	$(OFILES:.o=.d)
+
+#---------------------------------------------------------------------------------
+# main targets
+#---------------------------------------------------------------------------------
+$(OUTPUT).dol: $(OUTPUT).elf
+$(OUTPUT).elf: $(OFILES)
+
+$(OFILES_SOURCES) : $(HFILES)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .jpg extension
+#---------------------------------------------------------------------------------
+%.jpg.o	:	%.jpg
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .png extension
+#---------------------------------------------------------------------------------
+%.png.o	:	%.png
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .bmp extension
+#---------------------------------------------------------------------------------
+%.bmp.o	:	%.bmp
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .ttf extension
+#---------------------------------------------------------------------------------
+%.ttf.o	:	%.ttf
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+-include $(DEPENDS)
+
+#---------------------------------------------------------------------------------
+# This rule links in binary data with the .wav extension
+#---------------------------------------------------------------------------------
+%.wav.o	:	%.wav
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	$(bin2o)
+
+-include $(DEPENDS)
+#---------------------------------------------------------------------------------
+endif
+#---------------------------------------------------------------------------------

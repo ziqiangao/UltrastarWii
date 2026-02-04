@@ -4,6 +4,7 @@
 #include <gctypes.h>
 
 extern volatile u8 globalstop;
+extern void (*main_thread_vsync)(void);
 
 #endif // GBLSTOP
 

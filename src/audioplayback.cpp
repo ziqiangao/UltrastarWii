@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "../bridge/audioplayback.hpp"
+#include "audioplayback.hpp"
+#include "globalstop.h"
 
 static volatile u8 stop = 0;
 volatile u32 mp3time = 0;
